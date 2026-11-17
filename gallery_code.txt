@@ -1,0 +1,121 @@
+</script>
+<style>
+@keyframes massPageOut {
+ to {opacity:0;transform:translateY(-8px)}
+}
+body.massPageOut {animation:massPageOut .25s ease forwards}
+</style>
+
+</body>
+</html>
+"""
+
+
+@app.route("/")
+def home():
+    return render_template_string(
+        HTML,
+        logged=session.get("admin", False),
+        categories=CATEGORIES,
+        files=files
+    )
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    if (
+        request.form.get("username") == USERNAME
+        and check_password_hash(
+            PASSWORD_HASH,
+            request.form.get("password", "")
+        )
+    ):
+        session["admin"] = True
+
+    return redirect("/")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
+
+@app.route("/upload", methods=["POST"])
+@admin_required
+def upload():
+
+    f = request.files.get("file")
+    category = request.form.get("category")
+
+    if not f or not f.filename:
+        return "No file selected", 400
+
+    if category not in CATEGORIES:
+        return "Invalid category", 400
+
+    original = secure_filename(f.filename)
+
+    if "." not in original:
+        return "Invalid file", 400
+
+    ext = original.rsplit(".", 1)[1].lower()
+
+    if ext in IMAGES:
+        kind = "image"
+    elif ext in VIDEOS:
+        kind = "video"
+    else:
+        return "Only images and videos allowed", 400
+
+    name = uuid.uuid4().hex + "." + ext
+    f.save(os.path.join(UPLOAD_FOLDER, name))
+
+    files.append({
+        "name": name,
+        "category": category,
+        "kind": kind
+    })
+
+    save_files()
+    return redirect("/")
+
+
+@app.route("/delete", methods=["POST"])
+@admin_required
+def delete():
+
+    name = request.form.get("filename", "")
+
+    item = next(
+        (x for x in files if x["name"] == name),
+        None
+    )
+
+    if not item:
+        return "File not found", 404
+
+    path = os.path.join(UPLOAD_FOLDER, item["name"])
+
+    if os.path.isfile(path):
+        os.remove(path)
+
+    files.remove(item)
+    save_files()
+
+    return redirect("/")
+
+
+@app.route("/uploads/<path:filename>")
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@app.errorhandler(413)
+def too_large(error):
+    return "File too large. Maximum size is 100 MB.", 413
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+

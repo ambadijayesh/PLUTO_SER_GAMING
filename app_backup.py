@@ -170,6 +170,37 @@ footer{
 padding:25px;
 color:#aaa
 }
+
+/* PLUTO SER MASS LOADING THEME */
+#massLoader {
+ position:fixed; inset:0; z-index:99999;
+ background:#050505; display:flex;
+ align-items:center; justify-content:center;
+ transition:opacity .7s ease, visibility .7s ease;
+}
+#massLoader.hide {opacity:0;visibility:hidden}
+.loader-content {width:85%;max-width:350px;text-align:center}
+.loader-content h1 {
+ color:red;font-size:36px;letter-spacing:5px;
+ text-shadow:0 0 15px red,0 0 30px red;
+}
+.loader-content h2 {color:white;letter-spacing:8px}
+.loader-bar {
+ height:7px;background:#333;border-radius:20px;
+ overflow:hidden;margin-top:25px;
+}
+#loaderProgress {
+ width:0;height:100%;background:red;
+ box-shadow:0 0 15px red;
+ transition:width .2s ease;
+}
+#loaderText {color:red;letter-spacing:3px;margin-top:15px}
+body {animation:massPageIn .8s ease}
+@keyframes massPageIn {
+ from {opacity:0;transform:translateY(12px)}
+ to {opacity:1;transform:translateY(0)}
+}
+
 </style>
 </head>
 
@@ -258,6 +289,19 @@ placeholder="Password" required>
 
 <h2>🎮 GAMING COLLECTION</h2>
 
+<input type="search" id="searchBox"
+placeholder="🔍 Search gaming files..."
+oninput="searchFiles()">
+
+<script>
+function searchFiles(){
+    const q = document.getElementById("searchBox").value.toLowerCase();
+    document.querySelectorAll(".item").forEach(item => {
+        item.style.display = item.innerText.toLowerCase().includes(q) ? "" : "none";
+    });
+}
+</script>
+
 {% for f in files %}
 
 <div class="item">
@@ -273,6 +317,9 @@ placeholder="Password" required>
 {% endif %}
 
 <p>{{f.name}}</p>
+<a href="/uploads/{{f.name}}" download="{{f.name}}">
+⬇ DOWNLOAD FILE
+</a>
 
 {% if logged %}
 
@@ -320,6 +367,60 @@ function clearSelectedFile(){
     }
 }
 </script>
+
+
+<div id="massLoader">
+ <div class="loader-content">
+  <h1>PLUTO SER</h1>
+  <h2>GAMING</h2>
+  <div class="loader-bar">
+   <div id="loaderProgress"></div>
+  </div>
+  <p id="loaderText">LOADING 0%</p>
+ </div>
+</div>
+<script>
+(function(){
+ let progress=0;
+ const bar=document.getElementById('loaderProgress');
+ const label=document.getElementById('loaderText');
+ const loader=document.getElementById('massLoader');
+ const timer=setInterval(()=>{
+   progress=Math.min(progress+2,90);
+   bar.style.width=progress+'%';
+   label.textContent='LOADING '+progress+'%';
+ },40);
+ function finishLoading(){
+   clearInterval(timer);
+   progress=100;
+   bar.style.width='100%';
+   label.textContent='LOADING 100%';
+   setTimeout(()=>{
+     loader.classList.add('hide');
+     setTimeout(()=>loader.remove(),800);
+   },700);
+ }
+ if(document.readyState === 'complete'){
+   finishLoading();
+ } else {
+   window.addEventListener('load',finishLoading,{once:true});
+ }
+ setTimeout(finishLoading,5000);
+ document.addEventListener('click',e=>{
+   const a=e.target.closest('a');
+   if(!a || a.target==='_blank' || !a.getAttribute('href')) return;
+   const href=a.getAttribute('href');
+   if(href.startsWith('#') || href.startsWith('javascript:')) return;
+   document.body.classList.add('massPageOut');
+ });
+})();
+</script>
+<style>
+@keyframes massPageOut {
+ to {opacity:0;transform:translateY(-8px)}
+}
+body.massPageOut {animation:massPageOut .25s ease forwards}
+</style>
 
 </body>
 </html>
