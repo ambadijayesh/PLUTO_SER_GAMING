@@ -1,8 +1,8 @@
 
-from flask import Flask, request, redirect, session, render_template_string, send_from_directory
+from flask import Flask, request, redirect, session, render_template_string, send_from_directory, abort
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-import os, json, uuid
+import os, json, uuid, shutil
 from functools import wraps
 
 app = Flask(__name__)
@@ -17,18 +17,15 @@ DATA_FILE = os.path.join(app.root_path, "files.json")
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# FOLDER_SYSTEM
-FOLDER_SYSTEM = True
-
 CATEGORIES = [
-    "Gaming Clips",
-    "Gaming Photos",
+    "Gaming Wallpaper",
     "Gaming DP",
-    "Gaming Wallpapers"
+    "Gaming Clips",
+    "Gaming Photo"
 ]
 
 IMAGES = {"png", "jpg", "jpeg", "gif", "webp"}
-VIDEOS = {"mp4", "webm", "mov", "mkv"}
+VIDEOS = {"mp4", "webm", "mov", "mkv", "ogg"}
 
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 
@@ -42,6 +39,9 @@ def load_files():
         return []
 
 
+files = load_files()
+
+
 def save_files():
     temp = DATA_FILE + ".tmp"
     with open(temp, "w", encoding="utf-8") as f:
@@ -49,14 +49,49 @@ def save_files():
     os.replace(temp, DATA_FILE)
 
 
-files = load_files()
+# Preserve and migrate old uploaded files
+def migrate_old_files():
+    aliases = {
+        "Gaming Wallpapers": "Gaming Wallpaper",
+        "Gaming Photos": "Gaming Photo"
+    }
+
+    for item in files:
+        name = item.get("name", "")
+        old_category = item.get("category", "")
+        category = aliases.get(old_category, old_category)
+
+        if category not in CATEGORIES:
+            continue
+
+        target_folder = os.path.join(UPLOAD_FOLDER, category)
+        os.makedirs(target_folder, exist_ok=True)
+        target = os.path.join(target_folder, name)
+
+        if not os.path.exists(target):
+            candidates = [
+                os.path.join(UPLOAD_FOLDER, name),
+                os.path.join(UPLOAD_FOLDER, old_category, name)
+            ]
+
+            for source in candidates:
+                if os.path.isfile(source):
+                    shutil.move(source, target)
+                    break
+
+        item["category"] = category
+
+    save_files()
+
+
+migrate_old_files()
 
 
 def admin_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         if not session.get("admin"):
-            return "Unauthorized", 403
+            return redirect("/")
         return func(*args, **kwargs)
     return wrapper
 
@@ -132,7 +167,9 @@ max-width:95%
 img,video{
 width:100%;
 max-width:400px;
-border-radius:10px
+border-radius:10px;
+display:block;
+margin:12px auto
 }
 
 .admin-actions{
@@ -142,15 +179,20 @@ gap:12px;
 margin-bottom:20px
 }
 
-.admin-actions button,
-.admin-actions a{
+.admin-actions button,.admin-actions a{
 width:50%;
 display:block;
 padding:15px 5px
 }
 
-.upload-btn{background:linear-gradient(135deg,#ff0000,#8b0000)}
-.logout-btn{background:#333;border-color:#777}
+.upload-btn{
+background:linear-gradient(135deg,#ff0000,#8b0000)
+}
+
+.logout-btn{
+background:#333;
+border-color:#777
+}
 
 .file-box{
 background:#252525;
@@ -174,43 +216,117 @@ padding:25px;
 color:#aaa
 }
 
-/* PLUTO SER MASS LOADING THEME */
-#massLoader {
- position:fixed; inset:0; z-index:99999;
- background:#050505; display:flex;
- align-items:center; justify-content:center;
- transition:opacity .7s ease, visibility .7s ease;
-}
-#massLoader.hide {opacity:0;visibility:hidden}
-.loader-content {width:85%;max-width:350px;text-align:center}
-.loader-content h1 {
- color:red;font-size:36px;letter-spacing:5px;
- text-shadow:0 0 15px red,0 0 30px red;
-}
-.loader-content h2 {color:white;letter-spacing:8px}
-.loader-bar {
- height:7px;background:#333;border-radius:20px;
- overflow:hidden;margin-top:25px;
-}
-#loaderProgress {
- width:0;height:100%;background:red;
- box-shadow:0 0 15px red;
- transition:width .2s ease;
-}
-#loaderText {color:red;letter-spacing:3px;margin-top:15px}
-body {animation:massPageIn .8s ease}
-@keyframes massPageIn {
- from {opacity:0;transform:translateY(12px)}
- to {opacity:1;transform:translateY(0)}
+.folder-grid{
+display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:14px;
+margin:20px 15px
 }
 
+.folder-card{
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+min-height:120px;
+background:linear-gradient(145deg,#292929,#101010);
+border:1px solid red;
+border-radius:15px;
+color:white;
+text-decoration:none;
+font-size:17px;
+font-weight:bold;
+box-shadow:0 0 10px #550000
+}
+
+.folder-card:hover{
+box-shadow:0 0 20px red;
+transform:scale(1.02)
+}
+
+.back-home{
+display:inline-block;
+margin:15px;
+padding:14px 25px
+}
+
+#massLoader{
+position:fixed;
+inset:0;
+z-index:99999;
+background:#050505;
+display:flex;
+align-items:center;
+justify-content:center;
+transition:opacity .7s ease,visibility .7s ease
+}
+
+#massLoader.hide{
+opacity:0;
+visibility:hidden
+}
+
+.loader-content{
+width:85%;
+max-width:350px;
+text-align:center
+}
+
+.loader-content h1{
+color:red;
+font-size:36px;
+letter-spacing:5px;
+text-shadow:0 0 15px red,0 0 30px red
+}
+
+.loader-content h2{
+color:white;
+letter-spacing:8px
+}
+
+.loader-bar{
+height:7px;
+background:#333;
+border-radius:20px;
+overflow:hidden;
+margin-top:25px
+}
+
+#loaderProgress{
+width:0;
+height:100%;
+background:red;
+box-shadow:0 0 15px red;
+transition:width .2s ease
+}
+
+#loaderText{
+color:red;
+letter-spacing:3px;
+margin-top:15px
+}
+
+body{animation:massPageIn .8s ease}
+
+@keyframes massPageIn{
+from{opacity:0;transform:translateY(12px)}
+to{opacity:1;transform:translateY(0)}
+}
+
+@keyframes massPageOut{
+to{opacity:0;transform:translateY(-8px)}
+}
+
+body.massPageOut{
+animation:massPageOut .25s ease forwards
+}
 </style>
 </head>
 
 <body>
 
 <header>
-<h1> PLUTO SER GAMING WEB </h1>
+<h1>PLUTO SER GAMING WEB</h1>
 <a href="https://www.instagram.com/pluto_ser_her/" target="_blank">
 VISIT INSTAGRAM
 </a>
@@ -218,212 +334,190 @@ VISIT INSTAGRAM
 </header>
 
 {% if logged %}
-
 <div class="card">
-
 <h2>👑 ADMIN PANEL</h2>
 
 <div class="admin-actions">
-
-<button class="upload-btn"
-type="submit" form="uploadForm">
+<button class="upload-btn" type="submit" form="uploadForm">
 ⬆ UPLOAD
 </button>
 
-<a class="logout-btn" href="/logout">
-LOGOUT
-</a>
-
+<a class="logout-btn" href="/logout">LOGOUT</a>
 </div>
 
-<form id="uploadForm" method="POST"
-action="/upload" enctype="multipart/form-data">
+<form id="uploadForm" method="POST" action="/upload" enctype="multipart/form-data">
 
 <h3>CHOOSE CATEGORY</h3>
-
 <select name="category" required>
 {% for c in categories %}
-<option value="{{c}}">{{c}}</option>
+<option value="{{c}}" {% if folder_view and current_folder == c %}selected{% endif %}>{{c}}</option>
 {% endfor %}
 </select>
 
 <br>
-
 <h3>CHOOSE FILE</h3>
 
-<input type="file" name="file"
-accept="image/*,video/*" required>
+<input type="file" name="file" accept="image/*,video/*" required>
 
 <p id="selectedFile">NO FILE SELECTED</p>
 
 <button type="button" onclick="clearSelectedFile()">
 🗑 CLEAR SELECTED FILE
 </button>
-
-<br><br>
-
 </form>
 </div>
-
 {% else %}
-
 <div class="card">
 <h2>👑 ADMIN LOGIN</h2>
-
 <form method="POST" action="/login">
-
-<input name="username"
-placeholder="Username" required>
-
+<input name="username" placeholder="Username" required>
 <br>
-
-<input name="password"
-type="password"
-placeholder="Password" required>
-
+<input name="password" type="password" placeholder="Password" required>
 <br>
-
 <button type="submit">LOGIN</button>
-
 </form>
 </div>
-
 {% endif %}
 
-<h2>🎮 GAMING COLLECTION</h2>
+{% if not folder_view %}
+<h2>📁 GAMING FOLDERS</h2>
+
+<div class="folder-grid">
+{% for c in categories %}
+<a class="folder-card" href="/folder/{{c|urlencode}}">
+📁<br>{{c}}
+</a>
+{% endfor %}
+</div>
+{% else %}
+
+<a class="back-home" href="/">⬅ BACK TO HOME</a>
+
+<h2>📁 {{current_folder}}</h2>
 
 <input type="search" id="searchBox"
 placeholder="🔍 Search gaming files..."
 oninput="searchFiles()">
 
-<script>
-function searchFiles(){
-    const q = document.getElementById("searchBox").value.toLowerCase();
-    document.querySelectorAll(".item").forEach(item => {
-        item.style.display = item.innerText.toLowerCase().includes(q) ? "" : "none";
-    });
-}
-</script>
-
 {% for f in files %}
-
 <div class="item">
 
 <h3 class="category">{{f.category}}</h3>
 
 {% if f.kind == "image" %}
-<img src="/uploads/{{f.name}}" loading="lazy">
+<img src="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}" loading="lazy">
 {% elif f.kind == "video" %}
 <video controls preload="metadata">
-<source src="/uploads/{{f.name}}">
+<source src="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}">
 </video>
 {% endif %}
 
 <p>{{f.name}}</p>
-<a href="/uploads/{{f.name}}" download="{{f.name}}">
+
+<a href="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}" download="{{f.name}}">
 ⬇ DOWNLOAD FILE
 </a>
 
 {% if logged %}
-
 <div class="file-box">
 <form method="POST" action="/delete"
 onsubmit="return confirm('Delete this uploaded file?')">
 
-<input type="hidden" name="filename"
-value="{{f.name}}">
+<input type="hidden" name="filename" value="{{f.name}}">
+<input type="hidden" name="category" value="{{f.category}}">
 
 <button type="submit" class="delete-btn">
 🗑 DELETE UPLOADED FILE
 </button>
-
 </form>
 </div>
-
 {% endif %}
 
 </div>
-
 {% else %}
 <p>NO GAMING FILES YET</p>
 {% endfor %}
+{% endif %}
 
-<footer>
-🔥 PLUTO SER GAMING 🔥
-</footer>
+<footer>🔥 PLUTO SER GAMING 🔥</footer>
 
 <script>
-const fileInput = document.querySelector('input[name="file"]');
+function searchFiles(){
+const q=document.getElementById("searchBox").value.toLowerCase();
+document.querySelectorAll(".item").forEach(item=>{
+item.style.display=item.innerText.toLowerCase().includes(q)?"":"none";
+});
+}
+
+const fileInput=document.querySelector('input[name="file"]');
 
 if(fileInput){
-    fileInput.addEventListener("change", function(){
-        document.getElementById("selectedFile").textContent =
-        this.files.length ? this.files[0].name : "NO FILE SELECTED";
-    });
+fileInput.addEventListener("change",function(){
+document.getElementById("selectedFile").textContent=
+this.files.length?this.files[0].name:"NO FILE SELECTED";
+});
 }
 
 function clearSelectedFile(){
-    if(fileInput){
-        fileInput.value = "";
-        document.getElementById("selectedFile").textContent =
-        "NO FILE SELECTED";
-    }
+if(fileInput){
+fileInput.value="";
+document.getElementById("selectedFile").textContent="NO FILE SELECTED";
+}
 }
 </script>
-
 
 <div id="massLoader">
- <div class="loader-content">
-  <h1>PLUTO SER</h1>
-  <h2>GAMING</h2>
-  <div class="loader-bar">
-   <div id="loaderProgress"></div>
-  </div>
-  <p id="loaderText">LOADING 0%</p>
- </div>
+<div class="loader-content">
+<h1>PLUTO SER</h1>
+<h2>GAMING</h2>
+<div class="loader-bar">
+<div id="loaderProgress"></div>
 </div>
+<p id="loaderText">LOADING 0%</p>
+</div>
+</div>
+
 <script>
 (function(){
- let progress=0;
- const bar=document.getElementById('loaderProgress');
- const label=document.getElementById('loaderText');
- const loader=document.getElementById('massLoader');
- const timer=setInterval(()=>{
-   progress=Math.min(progress+2,90);
-   bar.style.width=progress+'%';
-   label.textContent='LOADING '+progress+'%';
- },40);
- function finishLoading(){
-   clearInterval(timer);
-   progress=100;
-   bar.style.width='100%';
-   label.textContent='LOADING 100%';
-   setTimeout(()=>{
-     loader.classList.add('hide');
-     setTimeout(()=>loader.remove(),800);
-   },700);
- }
- if(document.readyState === 'complete'){
-   finishLoading();
- } else {
-   window.addEventListener('load',finishLoading,{once:true});
- }
- setTimeout(finishLoading,5000);
- document.addEventListener('click',e=>{
-   const a=e.target.closest('a');
-   if(!a || a.target==='_blank' || !a.getAttribute('href')) return;
-   const href=a.getAttribute('href');
-   if(href.startsWith('#') || href.startsWith('javascript:')) return;
-   document.body.classList.add('massPageOut');
- });
+let progress=0;
+const bar=document.getElementById('loaderProgress');
+const label=document.getElementById('loaderText');
+const loader=document.getElementById('massLoader');
+
+const timer=setInterval(()=>{
+progress=Math.min(progress+2,90);
+bar.style.width=progress+'%';
+label.textContent='LOADING '+progress+'%';
+},40);
+
+function finishLoading(){
+clearInterval(timer);
+progress=100;
+bar.style.width='100%';
+label.textContent='LOADING 100%';
+setTimeout(()=>{
+loader.classList.add('hide');
+setTimeout(()=>loader.remove(),800);
+},700);
+}
+
+if(document.readyState==='complete'){
+finishLoading();
+}else{
+window.addEventListener('load',finishLoading,{once:true});
+}
+
+setTimeout(finishLoading,5000);
+
+document.addEventListener('click',e=>{
+const a=e.target.closest('a');
+if(!a||a.target==='_blank'||!a.getAttribute('href'))return;
+const href=a.getAttribute('href');
+if(href.startsWith('#')||href.startsWith('javascript:'))return;
+document.body.classList.add('massPageOut');
+});
 })();
 </script>
-<style>
-@keyframes massPageOut {
- to {opacity:0;transform:translateY(-8px)}
-}
-body.massPageOut {animation:massPageOut .25s ease forwards}
-</style>
 
 </body>
 </html>
@@ -436,7 +530,50 @@ def home():
         HTML,
         logged=session.get("admin", False),
         categories=CATEGORIES,
-        files=files
+        files=[],
+        folder_view=False,
+        current_folder=None
+    )
+
+
+@app.route("/folder/<folder_name>")
+def open_folder(folder_name):
+    if folder_name not in CATEGORIES:
+        abort(404)
+
+    folder_path = os.path.join(UPLOAD_FOLDER, folder_name)
+    os.makedirs(folder_path, exist_ok=True)
+
+    folder_files = []
+
+    for name in sorted(os.listdir(folder_path)):
+        path = os.path.join(folder_path, name)
+
+        if not os.path.isfile(path):
+            continue
+
+        ext = os.path.splitext(name)[1].lower().lstrip(".")
+
+        if ext in IMAGES:
+            kind = "image"
+        elif ext in VIDEOS:
+            kind = "video"
+        else:
+            continue
+
+        folder_files.append({
+            "name": name,
+            "category": folder_name,
+            "kind": kind
+        })
+
+    return render_template_string(
+        HTML,
+        logged=session.get("admin", False),
+        categories=CATEGORIES,
+        files=folder_files,
+        folder_view=True,
+        current_folder=folder_name
     )
 
 
@@ -463,7 +600,6 @@ def logout():
 @app.route("/upload", methods=["POST"])
 @admin_required
 def upload():
-
     f = request.files.get("file")
     category = request.form.get("category")
 
@@ -471,7 +607,7 @@ def upload():
         return "No file selected", 400
 
     if category not in CATEGORIES:
-        return "Invalid category", 400
+        return "Invalid folder", 400
 
     original = secure_filename(f.filename)
 
@@ -488,7 +624,11 @@ def upload():
         return "Only images and videos allowed", 400
 
     name = uuid.uuid4().hex + "." + ext
-    f.save(os.path.join(UPLOAD_FOLDER, name))
+
+    folder_path = os.path.join(UPLOAD_FOLDER, category)
+    os.makedirs(folder_path, exist_ok=True)
+
+    f.save(os.path.join(folder_path, name))
 
     files.append({
         "name": name,
@@ -497,24 +637,32 @@ def upload():
     })
 
     save_files()
-    return redirect("/")
+
+    return redirect("/folder/" + category)
 
 
 @app.route("/delete", methods=["POST"])
 @admin_required
 def delete():
-
     name = request.form.get("filename", "")
+    category = request.form.get("category", "")
+
+    if category not in CATEGORIES:
+        abort(400)
 
     item = next(
-        (x for x in files if x["name"] == name),
+        (
+            x for x in files
+            if x.get("name") == name
+            and x.get("category") == category
+        ),
         None
     )
 
     if not item:
         return "File not found", 404
 
-    path = os.path.join(UPLOAD_FOLDER, item["name"])
+    path = os.path.join(UPLOAD_FOLDER, category, name)
 
     if os.path.isfile(path):
         os.remove(path)
@@ -522,7 +670,7 @@ def delete():
     files.remove(item)
     save_files()
 
-    return redirect("/")
+    return redirect("/folder/" + category)
 
 
 @app.route("/uploads/<path:filename>")
