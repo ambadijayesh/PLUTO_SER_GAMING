@@ -320,10 +320,60 @@ to{opacity:0;transform:translateY(-8px)}
 body.massPageOut{
 animation:massPageOut .25s ease forwards
 }
+
+.menu-btn{
+position:fixed;
+top:15px;
+left:15px;
+z-index:100001;
+background:#b00000;
+font-size:18px;
+padding:6px 10px;
+}
+.sidebar{
+position:fixed;
+top:0;
+left:-280px;
+width:270px;
+height:100%;
+background:#101010;
+border-right:2px solid red;
+z-index:100000;
+padding:80px 20px 20px;
+transition:left .3s ease;
+}
+.sidebar.open{left:0}
+.sidebar a{
+display:block;
+margin:15px 0;
+padding:15px;
+}
+
 </style>
 </head>
 
 <body>
+
+<button class="menu-btn" onclick="toggleMenu()">☰</button>
+<div class="sidebar" id="sidebar">
+<h2>🔥 PLUTO SER</h2>
+<a href="/">🏠 HOME</a>
+<a href="/folder/Gaming%20Wallpaper">📁 GAMING WALLPAPER</a>
+<a href="/folder/Gaming%20DP">📁 GAMING DP</a>
+<a href="/folder/Gaming%20Clips">📁 GAMING CLIPS</a>
+<a href="/folder/Gaming%20Photo">📁 GAMING PHOTO</a>
+{% if logged %}
+<a href="/logout">🚪 LOGOUT</a>
+{% else %}
+<a href="/admin">👑 ADMIN LOGIN</a>
+{% endif %}
+</div>
+<script>
+function toggleMenu(){
+document.getElementById("sidebar").classList.toggle("open");
+}
+</script>
+
 
 <header>
 <h1>PLUTO SER GAMING WEB</h1>
@@ -364,17 +414,6 @@ VISIT INSTAGRAM
 <button type="button" onclick="clearSelectedFile()">
 🗑 CLEAR SELECTED FILE
 </button>
-</form>
-</div>
-{% else %}
-<div class="card">
-<h2>👑 ADMIN LOGIN</h2>
-<form method="POST" action="/login">
-<input name="username" placeholder="Username" required>
-<br>
-<input name="password" type="password" placeholder="Password" required>
-<br>
-<button type="submit">LOGIN</button>
 </form>
 </div>
 {% endif %}
@@ -522,6 +561,45 @@ document.body.classList.add('massPageOut');
 </body>
 </html>
 """
+
+
+
+ADMIN_LOGIN_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PLUTO SER ADMIN LOGIN</title>
+<style>
+body{background:#080808;color:white;text-align:center;font-family:Arial;padding:30px}
+.card{background:#191919;padding:25px;border:1px solid red;border-radius:15px;margin-top:60px}
+input{padding:13px;margin:10px;border-radius:7px;max-width:90%}
+button{background:#b00000;color:white;padding:13px 25px;border:0;border-radius:8px}
+a{color:white}
+</style>
+</head>
+<body>
+<div class="card">
+<h1 style="color:red">👑 PLUTO SER</h1>
+<h2>ADMIN LOGIN</h2>
+<form method="POST" action="/login">
+<input name="username" placeholder="Username" required>
+<br>
+<input name="password" type="password" placeholder="Password" required>
+<br>
+<button type="submit">LOGIN</button>
+</form>
+<br><a href="/">BACK TO HOME</a>
+</div>
+</body>
+</html>
+"""
+
+@app.route("/admin")
+def admin_page():
+    if session.get("admin"):
+        return redirect("/")
+    return render_template_string(ADMIN_LOGIN_HTML)
 
 
 @app.route("/")
