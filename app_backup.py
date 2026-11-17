@@ -1,98 +1,330 @@
-from flask import Flask, request, redirect, session, render_template_string
+
+from flask import Flask, request, redirect, session, render_template_string, send_from_directory
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-import os
+import os, json, uuid
+from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 
 USERNAME = "plutogaming"
-PASSWORD_HASH = generate_password_hash(
-    os.environ.get("ADMIN_PASSWORD", "ambadijayesh")
-)
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "ambadijayesh")
+PASSWORD_HASH = generate_password_hash(ADMIN_PASSWORD)
 
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = os.path.join(app.root_path, "uploads")
+DATA_FILE = os.path.join(app.root_path, "files.json")
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-CATEGORIES = ["Gaming Clips", "Gaming Photos", "Gaming DP", "Gaming Wallpapers"]
+CATEGORIES = [
+    "Gaming Clips",
+    "Gaming Photos",
+    "Gaming DP",
+    "Gaming Wallpapers"
+]
+
+IMAGES = {"png", "jpg", "jpeg", "gif", "webp"}
+VIDEOS = {"mp4", "webm", "mov", "mkv"}
+
+app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
+
+
+def load_files():
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def save_files():
+    temp = DATA_FILE + ".tmp"
+    with open(temp, "w", encoding="utf-8") as f:
+        json.dump(files, f, indent=2)
+    os.replace(temp, DATA_FILE)
+
+
+files = load_files()
+
+
+def admin_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not session.get("admin"):
+            return "Unauthorized", 403
+        return func(*args, **kwargs)
+    return wrapper
+
 
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>PLUTO SER GAMING</title>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PLUTO SER GAMING</title>
+
 <style>
-body{background:#080808;color:white;font-family:Arial;text-align:center;margin:0}
-header{background:#151515;padding:25px;border-bottom:2px solid red}
+*{box-sizing:border-box}
+
+body{
+background:linear-gradient(-45deg,#050505,#10102b,#200000,#050505);
+background-size:400% 400%;
+animation:bg 12s ease infinite;
+color:white;
+font-family:Arial;
+text-align:center;
+margin:0
+}
+
+@keyframes bg{
+0%{background-position:0% 50%}
+50%{background-position:100% 50%}
+100%{background-position:0% 50%}
+}
+
+header{
+background:#151515;
+padding:25px 10px;
+border-bottom:2px solid red
+}
+
 h1{
 color:red;
-animation: glow 2s infinite alternate;
+text-shadow:0 0 10px red,0 0 25px red
 }
 
-@keyframes glow{
-from{
-text-shadow:0 0 5px red;
-}
-to{
-text-shadow:0 0 25px red, 0 0 40px red;
-}
-}
-.card{background:#191919;margin:15px;padding:20px;border-radius:15px}
-
- a,button{background:linear-gradient(135deg,#ff0000,#8b0000);color:white;padding:12px 22px;border:1px solid #ff3333;border-radius:8px;text-decoration:none;cursor:pointer;transition:all .3s ease;box-shadow:0 0 8px #ff0000}button:hover,a:hover{transform:scale(1.07);box-shadow:0 0 22px #ff0000;background:linear-gradient(135deg,#ff3333,#cc0000)}button:active{transform:scale(.94)}
-input,select{padding:12px;margin:8px;border-radius:7px;max-width:90%}
-img,video{width:100%;max-width:350px;border-radius:10px}
-.item{background:#202020;margin:15px;padding:15px;border-radius:12px}
-body{position:relative;isolation:isolate;overflow-x:hidden}
-body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(circle,#ff3030 1.5px,transparent 2px),radial-gradient(circle,#ff0000 1px,transparent 2px),radial-gradient(circle,#ff7777 1px,transparent 2px);background-size:110px 110px,170px 170px,230px 230px;background-position:0 0,50px 80px,100px 30px;animation:neonParticles 12s linear infinite}
-@keyframes neonParticles{0%{background-position:0 0,50px 80px,100px 30px}100%{background-position:0 110px,50px 250px,100px 260px}}
-body {
-    background: linear-gradient(-45deg, #050505, #10102b, #200000, #050505);
-    background-size: 400% 400%;
-    animation: gamingBG 12s ease infinite;
+.card,.item{
+background:#191919;
+margin:15px;
+padding:20px;
+border-radius:15px;
+border:1px solid #333
 }
 
-@keyframes gamingBG {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+button,a{
+background:linear-gradient(135deg,#ff0000,#8b0000);
+color:white;
+padding:12px 18px;
+border:1px solid red;
+border-radius:8px;
+text-decoration:none;
+cursor:pointer;
+font-weight:bold
+}
+
+button:hover,a:hover{
+box-shadow:0 0 18px red
+}
+
+input,select{
+padding:12px;
+margin:8px;
+border-radius:7px;
+max-width:95%
+}
+
+img,video{
+width:100%;
+max-width:400px;
+border-radius:10px
+}
+
+.admin-actions{
+display:flex;
+justify-content:space-between;
+gap:12px;
+margin-bottom:20px
+}
+
+.admin-actions button,
+.admin-actions a{
+width:50%;
+display:block;
+padding:15px 5px
+}
+
+.upload-btn{background:linear-gradient(135deg,#ff0000,#8b0000)}
+.logout-btn{background:#333;border-color:#777}
+
+.file-box{
+background:#252525;
+padding:15px;
+border-radius:12px;
+margin-top:15px
+}
+
+.delete-btn{
+background:#b00000;
+margin-top:12px
+}
+
+.category{
+color:#ff4444;
+font-weight:bold
+}
+
+footer{
+padding:25px;
+color:#aaa
 }
 </style>
 </head>
+
 <body>
+
 <header>
-<h1>PLUTO SER GAMING WEB</h1>
+<h1> PLUTO SER GAMING WEB </h1>
 <a href="https://www.instagram.com/pluto_ser_her/" target="_blank">
 VISIT INSTAGRAM
 </a>
 <p>WELCOME TO GAMING WORLD</p>
 </header>
 
-{% if not logged %}
+{% if logged %}
+
 <div class="card">
+
 <h2>👑 ADMIN PANEL</h2>
 
-<div style="display:flex;justify-content:space-between;gap:10px;">
-<a href="/logout">LOGOUT</a>
-<button type="submit" form="uploadForm">UPLOAD</button>
+<div class="admin-actions">
+
+<button class="upload-btn"
+type="submit" form="uploadForm">
+⬆ UPLOAD
+</button>
+
+<a class="logout-btn" href="/logout">
+LOGOUT
+</a>
+
 </div>
 
-<form method="POST" action="/delete" style="text-align:center;">
-<input type="hidden" name="filename" value="{{f.name}}">
-<button type="submit">DELETE</button>
-</form>
+<form id="uploadForm" method="POST"
+action="/upload" enctype="multipart/form-data">
 
-<form method="POST" action="/delete" style="text-align:center;">
-<button type="submit">DELETE</button>
-</form>
-</div>
+<h3>CHOOSE CATEGORY</h3>
+
+<select name="category" required>
+{% for c in categories %}
+<option value="{{c}}">{{c}}</option>
 {% endfor %}
+</select>
+
+<br>
+
+<h3>CHOOSE FILE</h3>
+
+<input type="file" name="file"
+accept="image/*,video/*" required>
+
+<p id="selectedFile">NO FILE SELECTED</p>
+
+<button type="button" onclick="clearSelectedFile()">
+🗑 CLEAR SELECTED FILE
+</button>
+
+<br><br>
+
+</form>
+</div>
+
+{% else %}
+
+<div class="card">
+<h2>👑 ADMIN LOGIN</h2>
+
+<form method="POST" action="/login">
+
+<input name="username"
+placeholder="Username" required>
+
+<br>
+
+<input name="password"
+type="password"
+placeholder="Password" required>
+
+<br>
+
+<button type="submit">LOGIN</button>
+
+</form>
+</div>
+
+{% endif %}
+
+<h2>🎮 GAMING COLLECTION</h2>
+
+{% for f in files %}
+
+<div class="item">
+
+<h3 class="category">{{f.category}}</h3>
+
+{% if f.kind == "image" %}
+<img src="/uploads/{{f.name}}" loading="lazy">
+{% elif f.kind == "video" %}
+<video controls preload="metadata">
+<source src="/uploads/{{f.name}}">
+</video>
+{% endif %}
+
+<p>{{f.name}}</p>
+
+{% if logged %}
+
+<div class="file-box">
+<form method="POST" action="/delete"
+onsubmit="return confirm('Delete this uploaded file?')">
+
+<input type="hidden" name="filename"
+value="{{f.name}}">
+
+<button type="submit" class="delete-btn">
+🗑 DELETE UPLOADED FILE
+</button>
+
+</form>
+</div>
+
+{% endif %}
+
+</div>
+
+{% else %}
+<p>NO GAMING FILES YET</p>
+{% endfor %}
+
+<footer>
+🔥 PLUTO SER GAMING 🔥
+</footer>
+
+<script>
+const fileInput = document.querySelector('input[name="file"]');
+
+if(fileInput){
+    fileInput.addEventListener("change", function(){
+        document.getElementById("selectedFile").textContent =
+        this.files.length ? this.files[0].name : "NO FILE SELECTED";
+    });
+}
+
+function clearSelectedFile(){
+    if(fileInput){
+        fileInput.value = "";
+        document.getElementById("selectedFile").textContent =
+        "NO FILE SELECTED";
+    }
+}
+</script>
+
 </body>
 </html>
 """
 
-files = []
 
 @app.route("/")
 def home():
@@ -103,67 +335,102 @@ def home():
         files=files
     )
 
+
 @app.route("/login", methods=["POST"])
 def login():
-    if request.form.get("username") == USERNAME and check_password_hash(
-        PASSWORD_HASH, request.form.get("password", "")
+    if (
+        request.form.get("username") == USERNAME
+        and check_password_hash(
+            PASSWORD_HASH,
+            request.form.get("password", "")
+        )
     ):
         session["admin"] = True
+
     return redirect("/")
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
+
 @app.route("/upload", methods=["POST"])
+@admin_required
 def upload():
-    if not session.get("admin"):
-        return "Unauthorized", 403
 
     f = request.files.get("file")
     category = request.form.get("category")
 
-    if not f or not f.filename or category not in CATEGORIES:
-        return "Invalid upload", 400
+    if not f or not f.filename:
+        return "No file selected", 400
 
-    name = secure_filename(f.filename)
-    if not name:
-        return "Invalid filename", 400
+    if category not in CATEGORIES:
+        return "Invalid category", 400
 
-    path = os.path.join(UPLOAD_FOLDER, name)
-    if os.path.exists(path):
-        return "File already exists", 400
+    original = secure_filename(f.filename)
 
-    f.save(path)
-    kind = "video" if f.mimetype.startswith("video/") else "image"
+    if "." not in original:
+        return "Invalid file", 400
 
-    if not (f.mimetype.startswith("video/") or f.mimetype.startswith("image/")):
-        os.remove(path)
+    ext = original.rsplit(".", 1)[1].lower()
+
+    if ext in IMAGES:
+        kind = "image"
+    elif ext in VIDEOS:
+        kind = "video"
+    else:
         return "Only images and videos allowed", 400
 
-    files.append({"name": name, "category": category, "kind": kind})
+    name = uuid.uuid4().hex + "." + ext
+    f.save(os.path.join(UPLOAD_FOLDER, name))
+
+    files.append({
+        "name": name,
+        "category": category,
+        "kind": kind
+    })
+
+    save_files()
     return redirect("/")
+
 
 @app.route("/delete", methods=["POST"])
+@admin_required
 def delete():
-    if not session.get("admin"):
-        return "Unauthorized", 403
 
-    name = request.form.get("filename")
-    for item in files:
-        if item["name"] == name:
-            path = os.path.join(UPLOAD_FOLDER, name)
-            if os.path.exists(path):
-                os.remove(path)
-            files.remove(item)
-            break
+    name = request.form.get("filename", "")
+
+    item = next(
+        (x for x in files if x["name"] == name),
+        None
+    )
+
+    if not item:
+        return "File not found", 404
+
+    path = os.path.join(UPLOAD_FOLDER, item["name"])
+
+    if os.path.isfile(path):
+        os.remove(path)
+
+    files.remove(item)
+    save_files()
+
     return redirect("/")
 
-@app.route("/uploads/<path:name>")
-def uploaded(name):
-    from flask import send_from_directory
-    return send_from_directory(UPLOAD_FOLDER, name)
+
+@app.route("/uploads/<path:filename>")
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@app.errorhandler(413)
+def too_large(error):
+    return "File too large. Maximum size is 100 MB.", 413
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+

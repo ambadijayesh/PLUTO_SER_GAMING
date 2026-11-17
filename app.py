@@ -258,6 +258,19 @@ placeholder="Password" required>
 
 <h2>🎮 GAMING COLLECTION</h2>
 
+<input type="search" id="searchBox"
+placeholder="🔍 Search gaming files..."
+oninput="searchFiles()">
+
+<script>
+function searchFiles(){
+    const q = document.getElementById("searchBox").value.toLowerCase();
+    document.querySelectorAll(".item").forEach(item => {
+        item.style.display = item.innerText.toLowerCase().includes(q) ? "" : "none";
+    });
+}
+</script>
+
 {% for f in files %}
 
 <div class="item">
@@ -273,6 +286,9 @@ placeholder="Password" required>
 {% endif %}
 
 <p>{{f.name}}</p>
+<a href="/uploads/{{f.name}}" download="{{f.name}}">
+⬇ DOWNLOAD FILE
+</a>
 
 {% if logged %}
 
