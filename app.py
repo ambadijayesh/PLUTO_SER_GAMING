@@ -266,7 +266,7 @@ opacity:0;
 visibility:hidden
 }
 
-.loader-content{
+.intro-image{width:100%;max-width:280px;height:180px;object-fit:cover;border:2px solid red;border-radius:15px;box-shadow:0 0 25px red;margin:0 auto 25px;display:block}\n.loader-content{
 width:85%;
 max-width:350px;
 text-align:center
@@ -349,10 +349,76 @@ margin:15px 0;
 padding:15px;
 }
 
+
+#massLoader{background:radial-gradient(circle,#300000 0%,#100000 45%,#000 100%)}
+.mass-title{transition:all .5s ease;will-change:transform,filter;position:relative;transform-style:preserve-3d;filter:drop-shadow(0 0 15px red);font-size:clamp(35px,10vw,65px);font-weight:900;color:#ff0000;text-shadow:0 0 10px red,0 0 25px red,3px 3px 0 #550000;letter-spacing:5px;animation:massPulse 1s infinite alternate}
+@keyframes massPulse{0%{transform:perspective(500px) rotateX(10deg) scale(.95)}100%{transform:perspective(500px) rotateX(-10deg) scale(1.08)}}
+@keyframes massPulseOld{from{transform:scale(.95);text-shadow:0 0 10px red}to{transform:scale(1.08);text-shadow:0 0 30px red,0 0 50px #ff0000}}
+@keyframes massExit{to{opacity:0;visibility:hidden}}
+.mass-title:after{content:"";display:block;width:100%;height:3px;margin-top:15px;background:linear-gradient(90deg,transparent,red,white,red,transparent);box-shadow:0 0 15px red;animation:beamMove 1.5s infinite alternate}@keyframes beamMove{from{opacity:.4;transform:scaleX(.4)}to{opacity:1;transform:scaleX(1)}}
+
+#massLoader:before{content:"";position:absolute;width:200%;height:200%;background:linear-gradient(115deg,transparent 40%,rgba(255,0,0,.15) 50%,transparent 60%);animation:lightSweep 2.5s linear infinite;pointer-events:none}
+@keyframes lightSweep{from{transform:translateX(-30%) rotate(0deg)}to{transform:translateX(30%) rotate(0deg)}}
+.mass-title{animation:massPulse 1s infinite alternate, titleEnter 1.2s ease both}@keyframes titleEnter{0%{opacity:0;transform:scale(.2) rotateX(90deg);filter:blur(15px)}100%{opacity:1;transform:scale(1);filter:blur(0)}}
+
+/* PLUTO SER NEON LOADING BAR FIX */
+.loader-bar{
+display:block!important;
+width:100%!important;
+height:16px!important;
+background:#333!important;
+border:1px solid red!important;
+border-radius:20px!important;
+overflow:hidden!important;
+margin-top:25px!important;
+box-shadow:0 0 12px #ff0000!important;
+}
+#loaderProgress{
+display:block!important;
+height:100%!important;
+width:0%;
+background:linear-gradient(90deg,#ff0000,#ff5555,#ff0000)!important;
+box-shadow:0 0 20px red!important;
+border-radius:20px!important;
+}
+
+
+/* FORCE REAL PROGRESS BAR */
+#massLoader .loader-bar{
+display:block!important;
+position:relative!important;
+width:100%!important;
+height:18px!important;
+background:#252525!important;
+border:2px solid #ff0000!important;
+border-radius:30px!important;
+overflow:hidden!important;
+margin:25px auto!important;
+box-shadow:0 0 15px red!important;
+}
+#massLoader #loaderProgress{
+display:block!important;
+position:absolute!important;
+top:0!important;
+left:0!important;
+height:100%!important;
+width:0%;
+background:#ff0000!important;
+border-radius:30px!important;
+box-shadow:0 0 20px #ff0000!important;
+transition:width .06s linear!important;
+}
+#massLoader #loaderText{
+display:block!important;
+color:#ff0000!important;
+font-size:18px!important;
+}
+
 </style>
 </head>
 
 <body>
+
 
 <button class="menu-btn" onclick="toggleMenu()">☰</button>
 <div class="sidebar" id="sidebar">
@@ -507,6 +573,7 @@ document.getElementById("selectedFile").textContent="NO FILE SELECTED";
 
 <div id="massLoader">
 <div class="loader-content">
+<img class="intro-image" src="/static/pluto-intro.png" alt="PLUTO SER INTRO">
 <h1>PLUTO SER</h1>
 <h2>GAMING</h2>
 <div class="loader-bar">
@@ -523,38 +590,23 @@ const bar=document.getElementById('loaderProgress');
 const label=document.getElementById('loaderText');
 const loader=document.getElementById('massLoader');
 
+bar.style.width='0%';
+label.textContent='LOADING 0%';
+
 const timer=setInterval(()=>{
-progress=Math.min(progress+2,90);
+progress++;
 bar.style.width=progress+'%';
 label.textContent='LOADING '+progress+'%';
-},40);
 
-function finishLoading(){
+if(progress>=100){
 clearInterval(timer);
-progress=100;
-bar.style.width='100%';
 label.textContent='LOADING 100%';
 setTimeout(()=>{
 loader.classList.add('hide');
 setTimeout(()=>loader.remove(),800);
 },700);
 }
-
-if(document.readyState==='complete'){
-finishLoading();
-}else{
-window.addEventListener('load',finishLoading,{once:true});
-}
-
-setTimeout(finishLoading,5000);
-
-document.addEventListener('click',e=>{
-const a=e.target.closest('a');
-if(!a||a.target==='_blank'||!a.getAttribute('href'))return;
-const href=a.getAttribute('href');
-if(href.startsWith('#')||href.startsWith('javascript:'))return;
-document.body.classList.add('massPageOut');
-});
+},60);
 })();
 </script>
 
