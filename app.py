@@ -20,8 +20,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 CATEGORIES = [
     "Gaming Wallpaper",
     "Gaming DP",
-    "Gaming Clips",
-    "Gaming Photo"
+    "Gaming Photo",
+    "Gaming Video"
 ]
 
 IMAGES = {"png", "jpg", "jpeg", "gif", "webp"}
@@ -164,13 +164,106 @@ border-radius:7px;
 max-width:95%
 }
 
-img,video{
-width:100%;
-max-width:400px;
-border-radius:10px;
-display:block;
-margin:12px auto
+
+.gallery-grid{
+display:grid;
+grid-template-columns:repeat(3,minmax(0,1fr));
+gap:9px;
+margin:18px 12px;
 }
+
+.gallery-card{
+position:relative;
+aspect-ratio:1/1;
+overflow:hidden;
+border:1px solid #ff2020;
+border-radius:10px;
+background:#111;
+cursor:pointer;
+box-shadow:0 0 8px #550000;
+}
+
+.gallery-card img,
+.gallery-card video{
+width:100%;
+height:100%;
+object-fit:cover;
+display:block;
+margin:0;
+border-radius:9px;
+}
+
+.video-icon{
+position:absolute;
+inset:0;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:35px;
+color:white;
+text-shadow:0 0 12px red;
+pointer-events:none;
+}
+
+.gallery-card:hover{
+box-shadow:0 0 18px red;
+}
+
+.gallery-name{
+font-size:11px;
+color:#ddd;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap;
+padding:5px 2px;
+}
+
+.media-modal{
+display:none;
+position:fixed;
+inset:0;
+z-index:200000;
+background:rgba(0,0,0,.96);
+align-items:center;
+justify-content:center;
+padding:15px;
+}
+
+.media-modal.open{
+display:flex;
+}
+
+.modal-content{
+width:100%;
+max-width:650px;
+position:relative;
+}
+
+.modal-content img,
+.modal-content video{
+width:100%;
+max-height:78vh;
+object-fit:contain;
+display:block;
+margin:auto;
+border-radius:10px;
+}
+
+.modal-close{
+position:absolute;
+top:-42px;
+right:0;
+background:#c00000;
+font-size:22px;
+padding:8px 15px;
+}
+
+@media(max-width:360px){
+.gallery-grid{
+grid-template-columns:repeat(2,minmax(0,1fr));
+}
+}
+
 
 .admin-actions{
 display:flex;
@@ -325,7 +418,7 @@ animation:massPageOut .25s ease forwards
 position:fixed;
 top:15px;
 left:15px;
-z-index:100001;
+z-index:90000;
 background:#b00000;
 font-size:18px;
 padding:6px 10px;
@@ -338,11 +431,25 @@ width:270px;
 height:100%;
 background:#101010;
 border-right:2px solid red;
-z-index:100000;
+z-index:90001;
 padding:80px 20px 20px;
 transition:left .3s ease;
 }
 .sidebar.open{left:0}
+.close-menu{
+position:absolute;
+top:15px;
+right:15px;
+background:#b00000;
+color:white;
+border:2px solid red;
+border-radius:8px;
+font-size:22px;
+font-weight:bold;
+padding:8px 13px;
+cursor:pointer;
+box-shadow:0 0 15px red;
+}
 .sidebar a{
 display:block;
 margin:15px 0;
@@ -420,26 +527,22 @@ font-size:18px!important;
 <body>
 
 
+{% if not folder_view %}
 <button class="menu-btn" onclick="toggleMenu()">☰</button>
 <div class="sidebar" id="sidebar">
-<h2>🔥 PLUTO SER</h2>
-<a href="/">🏠 HOME</a>
-<a href="/folder/Gaming%20Wallpaper">📁 GAMING WALLPAPER</a>
-<a href="/folder/Gaming%20DP">📁 GAMING DP</a>
-<a href="/folder/Gaming%20Clips">📁 GAMING CLIPS</a>
-<a href="/folder/Gaming%20Photo">📁 GAMING PHOTO</a>
+<button onclick="toggleMenu()" style="color:white;background:#b00000;border:0;padding:12px;border-radius:8px;font-size:20px;">✕ CLOSE</button>
 {% if logged %}
 <a href="/logout">🚪 LOGOUT</a>
 {% else %}
 <a href="/admin">👑 ADMIN LOGIN</a>
 {% endif %}
 </div>
+{% endif %}
 <script>
 function toggleMenu(){
-document.getElementById("sidebar").classList.toggle("open");
+    document.getElementById("sidebar").classList.toggle("open");
 }
 </script>
-
 
 <header>
 <h1>PLUTO SER GAMING WEB</h1>
@@ -504,49 +607,103 @@ VISIT INSTAGRAM
 placeholder="🔍 Search gaming files..."
 oninput="searchFiles()">
 
+<div class="gallery-grid">
 {% for f in files %}
-<div class="item">
-
-<h3 class="category">{{f.category}}</h3>
+<div>
+<div class="gallery-card"
+onclick="openMedia(this)"
+data-kind="{{f.kind}}"
+data-src="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}"
+data-name="{{f.name}}">
 
 {% if f.kind == "image" %}
-<img src="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}" loading="lazy">
+<img src="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}" loading="lazy" alt="{{f.name}}">
 {% elif f.kind == "video" %}
-<video controls preload="metadata">
+<video muted preload="metadata">
 <source src="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}">
 </video>
+<span class="video-icon">▶</span>
 {% endif %}
 
-<p>{{f.name}}</p>
+</div>
+
+<div class="gallery-name">{{f.name}}</div>
 
 <a href="/uploads/{{f.category|urlencode}}/{{f.name|urlencode}}" download="{{f.name}}">
-⬇ DOWNLOAD FILE
+⬇ DOWNLOAD
 </a>
 
 {% if logged %}
 <div class="file-box">
 <form method="POST" action="/delete"
 onsubmit="return confirm('Delete this uploaded file?')">
-
 <input type="hidden" name="filename" value="{{f.name}}">
 <input type="hidden" name="category" value="{{f.category}}">
-
-<button type="submit" class="delete-btn">
-🗑 DELETE UPLOADED FILE
-</button>
+<button type="submit" class="delete-btn">🗑 DELETE</button>
 </form>
 </div>
 {% endif %}
-
 </div>
 {% else %}
 <p>NO GAMING FILES YET</p>
 {% endfor %}
+</div>
+
+<div class="media-modal" id="mediaModal" onclick="closeMedia()">
+<div class="modal-content" onclick="event.stopPropagation()">
+<button class="modal-close" onclick="closeMedia()">✕ CLOSE</button>
+<img id="modalImage" style="display:none" alt="Gallery image">
+<video id="modalVideo" controls playsinline style="display:none"></video>
+<p id="modalName"></p>
+</div>
+</div>
 {% endif %}
 
 <footer>🔥 PLUTO SER GAMING 🔥</footer>
 
 <script>
+
+function openMedia(card){
+const modal=document.getElementById("mediaModal");
+const img=document.getElementById("modalImage");
+const video=document.getElementById("modalVideo");
+const src=card.dataset.src;
+
+img.style.display="none";
+video.style.display="none";
+video.pause();
+video.removeAttribute("src");
+video.load();
+
+if(card.dataset.kind==="image"){
+img.src=src;
+img.style.display="block";
+}else{
+video.src=src;
+video.style.display="block";
+video.load();
+}
+
+document.getElementById("modalName").textContent=card.dataset.name;
+modal.classList.add("open");
+document.body.style.overflow="hidden";
+}
+
+function closeMedia(){
+const modal=document.getElementById("mediaModal");
+const video=document.getElementById("modalVideo");
+modal.classList.remove("open");
+video.pause();
+video.removeAttribute("src");
+video.load();
+document.getElementById("modalImage").src="";
+document.body.style.overflow="";
+}
+
+document.addEventListener("keydown",function(e){
+if(e.key==="Escape")closeMedia();
+});
+
 function searchFiles(){
 const q=document.getElementById("searchBox").value.toLowerCase();
 document.querySelectorAll(".item").forEach(item=>{
@@ -585,10 +742,18 @@ document.getElementById("selectedFile").textContent="NO FILE SELECTED";
 
 <script>
 (function(){
+const loader=document.getElementById('massLoader');
+
+if(sessionStorage.getItem('plutoIntroSeen')){
+if(loader)loader.remove();
+return;
+}
+
+sessionStorage.setItem('plutoIntroSeen','yes');
+
 let progress=0;
 const bar=document.getElementById('loaderProgress');
 const label=document.getElementById('loaderText');
-const loader=document.getElementById('massLoader');
 
 bar.style.width='0%';
 label.textContent='LOADING 0%';
